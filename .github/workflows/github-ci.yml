@@ -78,17 +78,20 @@ jobs:
       github.ref == 'refs/heads/main' ||
       startsWith(github.ref, 'refs/tags/')
     outputs:
-      docker_tag: ${{ steps.calc_tag.outputs.version }}
+      docker_tag: ${{ steps.calc_tag.outputs.tag }} 
     steps:
-      - name: Tính toán Tag tự động (Docker Metadata)
+      - name: Tính toán Tag tự động
         id: calc_tag
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ vars.DOCKER_REGISTRY }}/sslink-backend
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=ref,event=tag
-            type=sha,format=short,prefix=,enable=${{ github.ref == 'refs/heads/dev' }}
+        run: |
+          if [[ "${{ github.ref }}" == 'refs/heads/main' ]]; then
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref }}" == 'refs/heads/dev' ]]; then
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            echo "tag=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            echo "tag=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          fi
 
   build_job:
     runs-on: ubuntu-latest 
@@ -167,14 +170,11 @@ jobs:
           docker compose ps
           docker compose logs --tail=200 backend || true
 
-      - name: Check Backend Health
+      - name: Check Backend Health and Frontend Accessibility
         run: |
           curl -f http://localhost:8080/actuator/health || (echo "Backend unreachable" && exit 1)
-
-      - name: Check Frontend Health
-        run: |
           curl -f http://localhost:80/ || (echo "Frontend unreachable" && exit 1)
-          
+
       - name: Cleanup Docker System
         if: always()
         run: |
