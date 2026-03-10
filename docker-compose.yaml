@@ -2,8 +2,8 @@ services:
   database:
     image: postgres:alpine
     restart: always
-    ports:
-      - "5432:5432"
+    # ports:
+    #   - "5432:5432"
     volumes:
       - ./database:/var/lib/postgresql/data
     environment:
@@ -15,13 +15,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - unipoint
   
   backend:
     build: ./backend
-    image: ${DOCKER_REGISTRY:-ngtukien218}/sslink-backend:${BACKEND_VERSION:-latest}
+    image: ${DOCKER_REGISTRY:-ngtukien218}/unipoint-backend:${BACKEND_VERSION:-latest}
     restart: always
-    ports:
-      - "8080:8080"
+    # ports:
+    #   - "8080:8080"
     env_file:
       - .env
     environment:
@@ -36,16 +38,24 @@ services:
       timeout: 10s
       retries: 3
     volumes:
-      - ./logs:/app/logs
+      - ./backend/logs:/app/logs
+    networks:
+      - unipoint
 
   frontend:
     build: ./frontend
-    image: ${DOCKER_REGISTRY:-ngtukien218}/sslink-frontend:${FRONTEND_VERSION:-latest}
+    image: ${DOCKER_REGISTRY:-ngtukien218}/unipoint-frontend:${FRONTEND_VERSION:-latest}
     restart: always
     ports:
       - "80:80"
     depends_on:
       - backend
+    networks:
+      - unipoint
     
+networks:
+  unipoint:
+    driver: bridge
+  
 
 
