@@ -113,6 +113,13 @@ jobs:
           docker pull $REGISTRY_IMAGE/sslink-backend:$TAG || true
           docker build --cache-from $REGISTRY_IMAGE/sslink-backend:$TAG -t $REGISTRY_IMAGE/sslink-backend:$TAG ./backend
           docker push $REGISTRY_IMAGE/sslink-backend:$TAG
+
+      - name: Build and Push Frontend
+        run: |
+          docker pull $REGISTRY_IMAGE/sslink-frontend:$TAG || true
+          docker build --cache-from $REGISTRY_IMAGE/sslink-frontend:$TAG -t $REGISTRY_IMAGE/sslink-frontend:$TAG ./frontend
+          docker push $REGISTRY_IMAGE/sslink-frontend:$TAG
+
       - name: Cleanup Docker System
         if: always() 
         run: docker system prune -af
@@ -147,7 +154,6 @@ jobs:
           echo "${{ secrets.ENV_FILE }}" > .env
           
           echo "TAG=$TAG" >> .env
-          echo "BACKEND_VERSION=$TAG" >> .env
           echo "DOCKER_REGISTRY=$REGISTRY_IMAGE" >> .env
 
       - name: Start services with Docker Compose
@@ -165,6 +171,10 @@ jobs:
         run: |
           curl -f http://localhost:8080/actuator/health || (echo "Backend unreachable" && exit 1)
 
+      - name: Check Frontend Health
+        run: |
+          curl -f http://localhost:80/ || (echo "Frontend unreachable" && exit 1)
+          
       - name: Cleanup Docker System
         if: always()
         run: |
