@@ -200,6 +200,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: jacoco-coverage-report
+          path: .
         
       - name: Run SonarCloud Code Quality Scan
         uses: SonarSource/sonarqube-scan-action@v5.0.0 
