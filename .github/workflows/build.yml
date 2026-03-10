@@ -1,0 +1,149 @@
+name: Build & Push Pipeline
+
+on:
+  workflow_run:
+    workflows: ["Tag Pipeline"]
+    types:
+      - completed
+    branches: [ "main", "dev" ]
+
+permissions:
+  contents: read
+
+jobs:
+  get_tag:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      docker_tag: ${{ steps.get_tag.outputs.tag }}
+    steps:
+      - name: Get Tag from Previous Workflow
+        id: get_tag
+        run: |
+          if [[ "${{ github.event.workflow_run.head_branch }}" == 'main' ]]; then
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event.workflow_run.head_branch }}" == 'dev' ]]; then
+            SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+            echo "tag=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
+  build_job:
+    runs-on: ubuntu-latest 
+    needs: [get_tag]
+    env:
+      TAG: ${{ needs.get_tag.outputs.docker_tag }}
+      REGISTRY_IMAGE: ${{ vars.DOCKER_REGISTRY }}
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          
+      - name: Log in to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          
+      - name: Build and Push Backend
+        run: |
+          docker pull $REGISTRY_IMAGE/sslink-backend:$TAG || true
+          docker build --cache-from $REGISTRY_IMAGE/sslink-backend:$TAG -t $REGISTRY_IMAGE/sslink-backend:$TAG ./backend
+          docker push $REGISTRY_IMAGE/sslink-backend:$TAG
+
+      - name: Build and Push Frontend
+        run: |
+          docker pull $REGISTRY_IMAGE/sslink-frontend:$TAG || true
+          docker build --cache-from $REGISTRY_IMAGE/sslink-frontend:$TAG -t $REGISTRY_IMAGE/sslink-frontend:$TAG ./frontend
+          docker push $REGISTRY_IMAGE/sslink-frontend:$TAG
+
+      - name: Cleanup Docker System
+        if: always() 
+        run: docker system prune -af
+
+  integration_test_job:
+    runs-on: ubuntu-latest
+    needs: [get_tag, build_job]
+    env:
+      TAG: ${{ needs.get_tag.outputs.docker_tag }}
+      REGISTRY_IMAGE: ${{ vars.DOCKER_REGISTRY }}
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Log in to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Setup Environment Variables
+        run: |
+          if [ -z "${{ secrets.ENV_FILE }}" ]; then
+            echo "ERROR: ENV_FILE secret is not set in GitHub"
+            exit 1
+          fi
+          
+          echo "${{ secrets.ENV_FILE }}" > .env
+          
+          echo "TAG=$TAG" >> .env
+          echo "DOCKER_REGISTRY=$REGISTRY_IMAGE" >> .env
+
+      - name: Start services with Docker Compose
+        run: |
+          docker compose pull
+          docker compose up -d --no-build
+          
+      - name: Wait and Check Logs
+        run: |
+          sleep 20
+          docker compose ps
+          docker compose logs --tail=200 backend || true
+          docker compose logs --tail=200 frontend || true
+
+      - name: Check Backend Health and Frontend Accessibility
+        run: |
+          curl -f http://localhost:8080/actuator/health || (echo "Backend unreachable" && exit 1)
+          curl -f http://localhost:80/ || (echo "Frontend unreachable" && exit 1)
+
+      - name: Cleanup Docker System
+        if: always()
+        run: |
+          docker compose down --volumes --rmi local
+          docker system prune -a -f
+
+  security_scan:
+    runs-on: ubuntu-latest
+    needs: [get_tag, build_job]
+    continue-on-error: true  
+    env:
+      TAG: ${{ needs.get_tag.outputs.docker_tag }}
+      REGISTRY_IMAGE: ${{ vars.DOCKER_REGISTRY }}
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+        
+      - name: Log in to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          
+      - name: Run Trivy vulnerability scanner - Filesystem
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'
+          
+      - name: Run Trivy vulnerability scanner - Backend Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.REGISTRY_IMAGE }}/sslink-backend:${{ env.TAG }}'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'

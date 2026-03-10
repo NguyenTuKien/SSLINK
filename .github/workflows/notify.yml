@@ -1,0 +1,32 @@
+name: Notification Pipeline
+
+on:
+  workflow_run:
+    workflows: ["Build & Push Pipeline"]
+    types:
+      - completed
+    branches: [ "main", "dev" ]
+
+permissions:
+  contents: read
+
+jobs:
+  notify_success:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Send Discord Notification - Success
+        run: |
+          curl -H "Content-Type: application/json" \
+          -d "{\"content\": \"✅ **DEPLOY SUCCESS!** 🚀\\n**Project:** ${{ github.repository }}\\n**Branch:** ${{ github.event.workflow_run.head_branch }}\\n**User:** ${{ github.event.workflow_run.actor.login }}\\n**Status:** 🟢 Thành công\\n👉 [Xem Pipeline](${{ github.event.workflow_run.html_url }})\"}" \
+          ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+  notify_fail:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - name: Send Discord Notification - Failed
+        run: |
+          curl -H "Content-Type: application/json" \
+          -d "{\"content\": \"🚨 **PIPELINE FAILED!** 💥\\n**Project:** ${{ github.repository }}\\n**Branch:** ${{ github.event.workflow_run.head_branch }}\\n**User:** ${{ github.event.workflow_run.actor.login }}\\n**Status:** 🔴 Thất bại\\n👉 [Xem lỗi tại đây](${{ github.event.workflow_run.html_url }})\"}" \
+          ${{ secrets.DISCORD_WEBHOOK_URL }}
