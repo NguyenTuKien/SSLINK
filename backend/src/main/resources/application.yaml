@@ -4,7 +4,7 @@ spring:
   application:
     name: backend
   datasource:
-    url: jdbc:postgresql://${DB_HOST:db.yqxkojuxhtsgwxhtlkzc.supabase.co}:${DB_PORT:5432}/${POSTGRES_DB:sslink}
+    url: jdbc:postgresql://${DB_HOST:db.yqxkojuxhtsgwxhtlkzc.supabase.co}:${DB_PORT:5432}/${POSTGRES_DB:unipointdb}
     username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:TTCS_CT01_N06}
     driver-class-name: org.postgresql.Driver

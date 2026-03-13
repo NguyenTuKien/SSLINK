@@ -1,0 +1,21 @@
+frontend:
+  name: frontend
+  replicaCount: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  image:
+    repository: ngtukien218/unipoint-frontend
+    tag: "v1.8"
+    pullPolicy: Always
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30030
+
+backend:
+  name: unipoint-backend
+  service:
+    port: 8080
