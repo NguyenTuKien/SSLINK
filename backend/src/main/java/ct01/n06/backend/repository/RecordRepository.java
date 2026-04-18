@@ -62,47 +62,47 @@ public interface RecordRepository extends JpaRepository<RecordEntity, Long> {
   List<RecordEntity> findByStudent_IdAndSemester_IdAndStatus(String studentId, Long semesterId,
       RecordStatus status);
 
-    @EntityGraph(attributePaths = {"semester", "criteria", "approver"})
-    @Query("""
-            select r
-            from RecordEntity r
-            where r.event is null
-                and r.student.id = :studentId
-                and (:status is null or r.status = :status)
-                and (:semesterId is null or r.semester.id = :semesterId)
-            order by r.createdAt desc
-            """)
-    Page<RecordEntity> findEvidenceDeclarationsForStudent(
-            @Param("studentId") String studentId,
-            @Param("status") RecordStatus status,
-            @Param("semesterId") Long semesterId,
-            Pageable pageable
-    );
+  @EntityGraph(attributePaths = {"semester", "criteria", "approver"})
+  @Query("""
+      select r
+      from RecordEntity r
+      where r.event is null
+          and r.student.id = :studentId
+          and (:status is null or r.status = :status)
+          and (:semesterId is null or r.semester.id = :semesterId)
+      order by r.createdAt desc
+      """)
+  Page<RecordEntity> findEvidenceDeclarationsForStudent(
+      @Param("studentId") String studentId,
+      @Param("status") RecordStatus status,
+      @Param("semesterId") Long semesterId,
+      Pageable pageable
+  );
 
-        @EntityGraph(attributePaths = {"student", "student.classEntity", "semester", "criteria", "approver"})
-        @Query("""
-            select r
-            from RecordEntity r
-            join r.student s
-            left join s.classEntity c
-            where r.event is null
-            and c.id = :classId
-            and (:status is null or r.status = :status)
-            and (:semesterId is null or r.semester.id = :semesterId)
-            order by r.createdAt desc
-            """)
-        Page<RecordEntity> findEvidenceDeclarationsForClass(
-            @Param("classId") Long classId,
-            @Param("status") RecordStatus status,
-            @Param("semesterId") Long semesterId,
-            Pageable pageable
-        );
+  @EntityGraph(attributePaths = {"student", "student.classEntity", "semester", "criteria", "approver"})
+  @Query("""
+      select r
+      from RecordEntity r
+      join r.student s
+      left join s.classEntity c
+      where r.event is null
+      and c.id = :classId
+      and (:status is null or r.status = :status)
+      and (:semesterId is null or r.semester.id = :semesterId)
+      order by r.createdAt desc
+      """)
+  Page<RecordEntity> findEvidenceDeclarationsForClass(
+      @Param("classId") Long classId,
+      @Param("status") RecordStatus status,
+      @Param("semesterId") Long semesterId,
+      Pageable pageable
+  );
 
-    @EntityGraph(attributePaths = {"semester", "criteria", "approver"})
-    Optional<RecordEntity> findByIdAndStudent_IdAndEventIsNull(Long id, String studentId);
+  @EntityGraph(attributePaths = {"semester", "criteria", "approver"})
+  Optional<RecordEntity> findByIdAndStudent_IdAndEventIsNull(Long id, String studentId);
 
-    @EntityGraph(attributePaths = {"student", "student.classEntity", "semester", "criteria", "approver"})
-    Optional<RecordEntity> findByIdAndEventIsNull(Long id);
+  @EntityGraph(attributePaths = {"student", "student.classEntity", "semester", "criteria", "approver"})
+  Optional<RecordEntity> findByIdAndEventIsNull(Long id);
 
   long countDistinctStudent_IdByEvent_IdAndStatus(Long eventId, RecordStatus status);
 

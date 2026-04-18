@@ -5,6 +5,7 @@ import {
     getMonitorEvidenceDeclarations,
     rejectMonitorEvidenceDeclaration,
 } from "../../../api/evidenceDeclarationApi";
+import { getAllCriteria } from "../../../api/evaluationApi";
 import { useCurrentSemester } from "../../../hooks/useCurrentSemester";
 
 const STATUS_OPTIONS = [
@@ -13,6 +14,7 @@ const STATUS_OPTIONS = [
     { value: "APPROVED", label: "Đã duyệt" },
     { value: "REJECTED", label: "Từ chối" },
 ];
+const PAGE_SIZE = 20;
 
 function statusLabel(status) {
     if (status === "APPROVED") return "Đã duyệt";
@@ -22,12 +24,12 @@ function statusLabel(status) {
 
 function statusPillClass(status) {
     if (status === "APPROVED") {
-        return "border border-green-200 bg-green-50 text-green-700";
+        return "border border-green-200 bg-green-50 text-green-700 dark:border-green-700/40 dark:bg-green-900/20 dark:text-green-300";
     }
     if (status === "REJECTED") {
-        return "border border-red-200 bg-red-50 text-red-700";
+        return "border border-red-200 bg-red-50 text-red-700 dark:border-red-700/40 dark:bg-red-900/20 dark:text-red-300";
     }
-    return "border border-yellow-200 bg-yellow-50 text-yellow-700";
+    return "border border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-700/40 dark:bg-yellow-900/20 dark:text-yellow-300";
 }
 
 export default function MonitorEvidenceReviewTab() {
@@ -36,12 +38,39 @@ export default function MonitorEvidenceReviewTab() {
     const [status, setStatus] = useState("");
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState("");
     const [workingId, setWorkingId] = useState(null);
+    const [page, setPage] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
     const [detailOpen, setDetailOpen] = useState(false);
     const [detailLoading, setDetailLoading] = useState(false);
     const [detailError, setDetailError] = useState("");
     const [detailItem, setDetailItem] = useState(null);
+    const [criteriaList, setCriteriaList] = useState([]);
+    const [criteriaLoading, setCriteriaLoading] = useState(false);
+    const [reviewOpen, setReviewOpen] = useState(false);
+    const [reviewAction, setReviewAction] = useState("approve");
+    const [reviewTarget, setReviewTarget] = useState(null);
+    const [reviewCriteriaId, setReviewCriteriaId] = useState("");
+    const [reviewNote, setReviewNote] = useState("");
+
+    useEffect(() => {
+        const loadCriteria = async () => {
+            setCriteriaLoading(true);
+            try {
+                const data = await getAllCriteria();
+                const normalized = Array.isArray(data) ? data : [];
+                setCriteriaList(normalized);
+            } catch {
+                setCriteriaList([]);
+            } finally {
+                setCriteriaLoading(false);
+            }
+        };
+
+        loadCriteria();
+    }, []);
 
     useEffect(() => {
         if (!selectedSemester && activeSemesterId) {
@@ -49,56 +78,116 @@ export default function MonitorEvidenceReviewTab() {
         }
     }, [activeSemesterId, selectedSemester]);
 
-    const loadData = useCallback(async () => {
+    const loadData = useCallback(async (targetPage = 0, options = {}) => {
+        const { append = false } = options;
         if (!selectedSemester) {
             setItems([]);
+            setPage(0);
+            setTotalPages(0);
             return;
         }
 
-        setLoading(true);
+        if (append) {
+            setLoadingMore(true);
+        } else {
+            setLoading(true);
+        }
         setError("");
         try {
             const payload = await getMonitorEvidenceDeclarations({
                 semesterId: Number(selectedSemester),
                 status: status || undefined,
-                page: 0,
-                size: 100,
+                page: targetPage,
+                size: PAGE_SIZE,
             });
-            setItems(Array.isArray(payload?.items) ? payload.items : []);
+            const nextItems = Array.isArray(payload?.items) ? payload.items : [];
+            setItems((prev) => (append ? [...prev, ...nextItems] : nextItems));
+            setPage(Number.isFinite(payload?.page) ? payload.page : targetPage);
+            setTotalPages(Number.isFinite(payload?.totalPages) ? payload.totalPages : 0);
         } catch (err) {
             setError(err.message || "Không tải được danh sách minh chứng.");
         } finally {
-            setLoading(false);
+            if (append) {
+                setLoadingMore(false);
+            } else {
+                setLoading(false);
+            }
         }
     }, [selectedSemester, status]);
 
     useEffect(() => {
-        loadData();
+        loadData(0, { append: false });
     }, [loadData]);
 
-    const runReviewAction = useCallback(async (id, action) => {
+    const runReviewAction = useCallback(async (id, action, payload) => {
         setWorkingId(id);
         setError("");
         try {
             if (action === "approve") {
-                await approveMonitorEvidenceDeclaration(id, {});
+                await approveMonitorEvidenceDeclaration(id, payload);
             } else {
-                await rejectMonitorEvidenceDeclaration(id, {});
+                await rejectMonitorEvidenceDeclaration(id, payload);
             }
-            await loadData();
+            await loadData(0, { append: false });
+            return true;
         } catch (err) {
             setError(err.message || "Không thể xử lý minh chứng.");
+            return false;
         } finally {
             setWorkingId(null);
         }
     }, [loadData]);
 
-    const handleApprove = async (id) => {
-        await runReviewAction(id, "approve");
+    const openReviewModal = (item, action) => {
+        setReviewTarget(item);
+        setReviewAction(action);
+        setReviewNote("");
+        setReviewCriteriaId(
+            action === "approve" && criteriaList.length > 0
+                ? String(criteriaList[0].id)
+                : "",
+        );
+        setReviewOpen(true);
     };
 
-    const handleReject = async (id) => {
-        await runReviewAction(id, "reject");
+    const closeReviewModal = () => {
+        setReviewOpen(false);
+        setReviewTarget(null);
+        setReviewNote("");
+        setReviewCriteriaId("");
+    };
+
+    const handleSubmitReview = async () => {
+        if (!reviewTarget?.id) {
+            return;
+        }
+
+        if (reviewAction === "approve" && !reviewCriteriaId) {
+            setError("Vui lòng chọn tiêu chí trước khi duyệt minh chứng.");
+            return;
+        }
+
+        const payload = {
+            reviewNote: reviewNote.trim() || undefined,
+        };
+
+        if (reviewAction === "approve") {
+            payload.criteriaId = Number(reviewCriteriaId);
+        }
+
+        const success = await runReviewAction(reviewTarget.id, reviewAction, payload);
+        if (success) {
+            closeReviewModal();
+        }
+    };
+
+    const hasMore = page + 1 < totalPages;
+
+    const handleLoadMore = async () => {
+        if (!hasMore || loadingMore) {
+            return;
+        }
+        await loadData(page + 1, { append: true });
     };
 
     const handleViewDetail = async (id) => {
@@ -198,7 +287,7 @@ export default function MonitorEvidenceReviewTab() {
                                             <div className="flex flex-wrap justify-end gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleApprove(item.id)}
+                                                    onClick={() => openReviewModal(item, "approve")}
                                                     title="Duyệt"
                                                     aria-label="Duyệt minh chứng"
                                                     className="inline-flex h-7 w-7 items-center justify-center rounded bg-green-600 text-xs font-bold text-white disabled:opacity-50"
@@ -208,7 +297,7 @@ export default function MonitorEvidenceReviewTab() {
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleReject(item.id)}
+                                                    onClick={() => openReviewModal(item, "reject")}
                                                     title="Từ chối"
                                                     aria-label="Từ chối minh chứng"
                                                     className="inline-flex h-7 w-7 items-center justify-center rounded bg-red-600 text-xs font-bold text-white disabled:opacity-50"
@@ -242,6 +331,102 @@ export default function MonitorEvidenceReviewTab() {
                     </tbody>
                 </table>
             </div>
+
+            <div className="mt-4 flex items-center justify-between gap-3">
+                <p className="text-sm text-slate-500">
+                    Trang {Math.min(page + 1, Math.max(totalPages, 1))}/{Math.max(totalPages, 1)}
+                </p>
+                {hasMore ? (
+                    <button
+                        type="button"
+                        onClick={handleLoadMore}
+                        disabled={loading || loadingMore}
+                        className="rounded border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                        {loadingMore ? "Đang tải..." : "Tải thêm"}
+                    </button>
+                ) : null}
+            </div>
+
+            {reviewOpen ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+                        <div className="mb-4 flex items-start justify-between gap-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900">
+                                    {reviewAction === "approve" ? "Xác nhận duyệt minh chứng" : "Xác nhận từ chối minh chứng"}
+                                </h3>
+                                <p className="mt-1 text-sm text-slate-500">
+                                    {reviewTarget?.customName || "Minh chứng"}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={closeReviewModal}
+                                className="rounded border border-slate-300 px-3 py-1 text-sm text-slate-700 hover:bg-slate-50"
+                            >
+                                Đóng
+                            </button>
+                        </div>
+
+                        {reviewAction === "approve" ? (
+                            <div className="mb-3">
+                                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                                    Tiêu chí đánh giá
+                                </label>
+                                <select
+                                    value={reviewCriteriaId}
+                                    onChange={(e) => setReviewCriteriaId(e.target.value)}
+                                    disabled={criteriaLoading}
+                                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                                >
+                                    <option value="">Chọn tiêu chí</option>
+                                    {criteriaList.map((criteria) => (
+                                        <option key={criteria.id} value={criteria.id}>
+                                            {criteria.code} - {criteria.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        ) : null}
+
+                        <div className="mb-4">
+                            <label className="mb-1 block text-sm font-semibold text-slate-700">
+                                Ghi chú (tùy chọn)
+                            </label>
+                            <textarea
+                                value={reviewNote}
+                                onChange={(e) => setReviewNote(e.target.value)}
+                                rows={3}
+                                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                                placeholder={reviewAction === "reject" ? "Nhập lý do từ chối" : "Nhập ghi chú duyệt"}
+                            />
+                        </div>
+
+                        <div className="flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={closeReviewModal}
+                                className="rounded border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSubmitReview}
+                                disabled={workingId === reviewTarget?.id || (reviewAction === "approve" && !reviewCriteriaId)}
+                                className="rounded bg-primary px-3 py-1 text-sm font-semibold text-white disabled:opacity-60"
+                            >
+                                {workingId === reviewTarget?.id
+                                    ? "Đang xử lý..."
+                                    : reviewAction === "approve"
+                                        ? "Xác nhận duyệt"
+                                        : "Xác nhận từ chối"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
             {detailOpen ? (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

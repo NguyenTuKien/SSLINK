@@ -36,7 +36,6 @@ import ct01.n06.backend.repository.RecordRepository;
 import ct01.n06.backend.repository.SemesterRepository;
 import ct01.n06.backend.repository.StudentRepository;
 import ct01.n06.backend.service.EvidenceDeclarationService;
-import ct01.n06.backend.service.UserService;
 
 @Service
 public class EvidenceDeclarationServiceImpl implements EvidenceDeclarationService {
@@ -49,7 +48,6 @@ public class EvidenceDeclarationServiceImpl implements EvidenceDeclarationServic
   private final ClassRepository classRepository;
   private final SemesterRepository semesterRepository;
   private final CriteriaRepository criteriaRepository;
-  private final UserService userService;
   private final NotificationRepository notificationRepository;
   private final NotificationRecipientRepository notificationRecipientRepository;
 
@@ -58,7 +56,6 @@ public class EvidenceDeclarationServiceImpl implements EvidenceDeclarationServic
       ClassRepository classRepository,
       SemesterRepository semesterRepository,
       CriteriaRepository criteriaRepository,
-      UserService userService,
       NotificationRepository notificationRepository,
       NotificationRecipientRepository notificationRecipientRepository) {
     this.recordRepository = recordRepository;
@@ -66,7 +63,6 @@ public class EvidenceDeclarationServiceImpl implements EvidenceDeclarationServic
     this.classRepository = classRepository;
     this.semesterRepository = semesterRepository;
     this.criteriaRepository = criteriaRepository;
-    this.userService = userService;
     this.notificationRepository = notificationRepository;
     this.notificationRecipientRepository = notificationRecipientRepository;
   }
@@ -185,7 +181,8 @@ public class EvidenceDeclarationServiceImpl implements EvidenceDeclarationServic
 
   private EvidenceDeclarationDetailResponse processMonitorReview(String userId, Long declarationId,
       ReviewEvidenceDeclarationRequest request, RecordStatus targetStatus) {
-    ClassEntity managedClass = getMonitorManagedClass(userId);
+    StudentEntity monitorStudent = getStudentByUserId(userId);
+    ClassEntity managedClass = getManagedClassForMonitor(monitorStudent);
     RecordEntity declaration = getDeclarationForClassScope(declarationId, managedClass.getId());
     ensurePending(declaration);
 
@@ -193,7 +190,10 @@ public class EvidenceDeclarationServiceImpl implements EvidenceDeclarationServic
 
     CriteriaEntity criteria = resolveCriteriaForApproval(request, targetStatus);
 
-    UserEntity approver = userService.requireCurrentUser();
+    UserEntity approver = monitorStudent.getUserEntity();
+    if (approver == null) {
+      throw new ApiException(HttpStatus.FORBIDDEN, "Bạn không có quyền duyệt minh chứng này.");
+    }
     declaration.setStatus(targetStatus);
     declaration.setCriteria(criteria);
     declaration.setReviewNote(reviewNote);
@@ -207,8 +207,13 @@ public class EvidenceDeclarationServiceImpl implements EvidenceDeclarationServic
 
   private CriteriaEntity resolveCriteriaForApproval(ReviewEvidenceDeclarationRequest request,
       RecordStatus targetStatus) {
-    if (targetStatus != RecordStatus.APPROVED || request == null || request.criteriaId() == null) {
+    if (targetStatus != RecordStatus.APPROVED) {
       return null;
+    }
+
+    if (request == null || request.criteriaId() == null) {
+      throw new ApiException(HttpStatus.BAD_REQUEST,
+          "Tiêu chí là bắt buộc khi duyệt minh chứng.");
     }
 
     return criteriaRepository.findById(request.criteriaId())
@@ -245,6 +250,10 @@ public class EvidenceDeclarationServiceImpl implements EvidenceDeclarationServic
 
   private ClassEntity getMonitorManagedClass(String userId) {
     StudentEntity monitorStudent = getStudentByUserId(userId);
+    return getManagedClassForMonitor(monitorStudent);
+  }
+
+  private ClassEntity getManagedClassForMonitor(StudentEntity monitorStudent) {
     return classRepository.findByMonitor_Id(monitorStudent.getId())
         .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN,
             "Bạn không có quyền thao tác minh chứng."));

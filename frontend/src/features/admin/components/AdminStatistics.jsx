@@ -187,7 +187,7 @@ function PieChartCard({ title, description, data }) {
 function LineChartCard({ title, description, data }) {
     const width = 760;
     const height = 280;
-    const padding = { top: 20, right: 24, bottom: 56, left: 48 };
+    const padding = { top: 20, right: 44, bottom: 56, left: 48 };
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
     const baselineY = padding.top + chartHeight;
@@ -269,29 +269,34 @@ function LineChartCard({ title, description, data }) {
                             />
                         ) : null}
 
-                        {points.map((point) => (
-                            <g key={point.label}>
-                                <circle cx={point.x} cy={point.y} r="4.5" fill="#2563eb" />
-                                <text
-                                    x={point.x}
-                                    y={height - 22}
-                                    textAnchor="middle"
-                                    fontSize="11"
-                                    fill="#475569"
-                                >
-                                    {(point.label || "").length > 12 ? `${point.label.slice(0, 11)}…` : point.label}
-                                </text>
-                                <text
-                                    x={point.x}
-                                    y={point.y - 10}
-                                    textAnchor="middle"
-                                    fontSize="11"
-                                    fill="#1e293b"
-                                >
-                                    {formatNumber(point.value)}
-                                </text>
-                            </g>
-                        ))}
+                        {points.map((point) => {
+                            const labelText =
+                                (point.label || "").length > 12 ? `${point.label.slice(0, 11)}…` : point.label;
+
+                            return (
+                                <g key={point.label}>
+                                    <circle cx={point.x} cy={point.y} r="4.5" fill="#2563eb" />
+                                    <text
+                                        x={point.x}
+                                        y={height - 22}
+                                        textAnchor="middle"
+                                        fontSize="11"
+                                        fill="#475569"
+                                    >
+                                        {labelText}
+                                    </text>
+                                    <text
+                                        x={point.x}
+                                        y={point.y - 10}
+                                        textAnchor="middle"
+                                        fontSize="11"
+                                        fill="#1e293b"
+                                    >
+                                        {formatNumber(point.value)}
+                                    </text>
+                                </g>
+                            );
+                        })}
                     </svg>
                 </div>
             ) : (
