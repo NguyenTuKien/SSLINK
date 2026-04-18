@@ -69,4 +69,10 @@ public class RecordEntity extends BaseJpaAuditingEntity {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = RecordConstant.COL_APPROVER_ID)
   private UserEntity approver;
+
+  @Column(name = RecordConstant.COL_REVIEW_NOTE, length = 1000)
+  private String reviewNote;
+
+  @Column(name = RecordConstant.COL_REVIEWED_AT)
+  private LocalDateTime reviewedAt;
 }

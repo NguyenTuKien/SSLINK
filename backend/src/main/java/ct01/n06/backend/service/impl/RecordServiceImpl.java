@@ -26,6 +26,9 @@ public class RecordServiceImpl implements RecordService {
 
     final Map<String, Double> autoScores = new HashMap<>();
     for (final RecordEntity record : records) {
+      if (record.getCriteria() == null || record.getCriteria().getPointPerItem() == null) {
+        continue;
+      }
       String criteriaCode = record.getCriteria().getCode();
       double point = record.getCriteria().getPointPerItem().doubleValue();
       autoScores.put(criteriaCode, autoScores.getOrDefault(criteriaCode, 0.0) + point);

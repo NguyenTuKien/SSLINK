@@ -16,4 +16,6 @@ public class RecordConstant {
   public static final String COL_ACTIVITY_TIME = "activity_time";
   public static final String COL_STATUS = "status";
   public static final String COL_APPROVER_ID = "approver_id";
+  public static final String COL_REVIEW_NOTE = "review_note";
+  public static final String COL_REVIEWED_AT = "reviewed_at";
 }
