@@ -121,7 +121,7 @@ jobs:
       github.event_name == 'pull_request'
     env:
       TAG: ${{ needs.tag_job.outputs.docker_tag }}
-      REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}
+      REGISTRY_IMAGE: ghcr.io/ngtukien
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -157,7 +157,7 @@ jobs:
       github.event_name == 'pull_request'
     env:
       TAG: ${{ needs.tag_job.outputs.docker_tag }}
-      REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}
+      REGISTRY_IMAGE: ghcr.io/ngtukien
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -251,7 +251,7 @@ jobs:
     continue-on-error: true  
     env:
       TAG: ${{ needs.tag_job.outputs.docker_tag }}
-      REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}
+      REGISTRY_IMAGE: ghcr.io/ngtukien
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
