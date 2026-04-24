@@ -1,4 +1,4 @@
-name: CI pipeline for ttcs
+name: CI pipeline for UniPoint
 
 on:
   push:
@@ -112,7 +112,7 @@ jobs:
           fi
 
   build_job:
-    name: Build and Push Docker Images
+    name: Build Docker Images
     runs-on: ubuntu-latest 
     needs: [unit_test_job, tag_job]  
     if: >
@@ -124,8 +124,10 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
-      - name: Set lowercase registry image
-        run: echo "REGISTRY_IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+      - name: Convert repository owner to lowercase
+        run: echo "REGISTRY_IMAGE=ghcr.io/${OWNER,,}" >> ${GITHUB_ENV}
+        env:
+          OWNER: '${{ github.repository_owner }}'
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -149,7 +151,7 @@ jobs:
         run: docker system prune -af
 
   integration_test_job:
-    name: Run Integration Tests on Environment
+    name: Integration Test
     runs-on: ubuntu-latest
     needs: [tag_job, build_job]
     if: >
@@ -161,8 +163,10 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
-      - name: Set lowercase registry image
-        run: echo "REGISTRY_IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+      - name: Convert repository owner to lowercase
+        run: echo "REGISTRY_IMAGE=ghcr.io/${OWNER,,}" >> ${GITHUB_ENV}
+        env:
+          OWNER: '${{ github.repository_owner }}'
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -264,8 +268,10 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
-      - name: Set lowercase registry image
-        run: echo "REGISTRY_IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+      - name: Convert repository owner to lowercase
+        run: echo "REGISTRY_IMAGE=ghcr.io/${OWNER,,}" >> ${GITHUB_ENV}
+        env:
+          OWNER: '${{ github.repository_owner }}'
         
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3

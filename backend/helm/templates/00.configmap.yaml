@@ -30,6 +30,6 @@ data:
   JWT_EXPIRATION_MS: "{{ .Values.backend.environment.JWT_EXPIRATION_MS }}"
   JWT_REFRESH_EXPIRATION_MS: "{{ .Values.backend.environment.JWT_REFRESH_EXPIRATION_MS }}"
   # Mail
-  SPRING_MAIL_HOST: "{{ .Values.backend.environment.MAIL_HOST | default \"smtp.gmail.com\" }}"
-  SPRING_MAIL_PORT: "{{ .Values.backend.environment.MAIL_PORT | default \"587\" }}"
+  SPRING_MAIL_HOST: {{ .Values.backend.environment.MAIL_HOST | default "smtp.gmail.com" | quote }}
+  SPRING_MAIL_PORT: {{ .Values.backend.environment.MAIL_PORT | default "587" | quote }}
   SPRING_MAIL_USERNAME: "{{ .Values.backend.environment.MAIL_USERNAME }}"
