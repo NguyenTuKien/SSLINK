@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getStudentNotificationUnreadCount } from "../api/notificationStatisticsApi";
+import { getStudentNotificationUnreadCount, getStudentNotifications } from "../api/notificationStatisticsApi";
+import { sendNativeNotification } from "../shared/utils/sendNotification";
+import { useRef } from "react";
 import StudentDashboard from "../features/student/components/StudentDashboard";
 import QRScanner from "../features/student/components/QRScanner";
 import StudentMobileNav from "../features/student/components/StudentMobileNav";
@@ -13,6 +15,7 @@ import StudentStatisticsPanel from "../features/student/components/StudentStatis
 import StudentNotificationsPanel from "../features/student/components/StudentNotificationsPanel";
 import StudentEvaluationBoard from "../features/student/StudentEvaluationBoard";
 import StudentEvidenceDeclarationPanel from "../features/student/components/StudentEvidenceDeclarationPanel";
+import StudentUtilitiesPanel from "../features/student/components/StudentUtilitiesPanel";
 
 function normalizeRole(role) {
   if (!role) return "";
@@ -53,6 +56,7 @@ const FEATURE_COMPONENTS = {
   evaluation: StudentEvaluationBoard,
   "manage-class": MonitorClass,
   evidence: StudentEvidenceDeclarationPanel,
+  utilities: StudentUtilitiesPanel,
 };
 
 export default function StudentPage() {
@@ -63,26 +67,47 @@ export default function StudentPage() {
 
   const [activeFeature, setActiveFeature] = useState("dashboard");
   const [studentUnreadCount, setStudentUnreadCount] = useState(0);
+  const notifiedIdsRef = useRef(new Set());
 
   useEffect(() => {
     let ignore = false;
 
-    async function fetchUnreadCount() {
+    async function checkNewNotifications() {
       try {
-        const payload = await getStudentNotificationUnreadCount();
-        if (!ignore) {
-          setStudentUnreadCount(Number(payload?.unreadCount || 0));
+        const payload = await getStudentNotifications({ page: 0, size: 5 });
+        if (ignore || !payload) return;
+
+        const nextUnread = Number(payload.unreadCount || 0);
+        setStudentUnreadCount(nextUnread);
+
+        if (nextUnread > 0) {
+          const unreadItems = (payload.items || []).filter(item => !item.isRead);
+          if (unreadItems.length > 0) {
+            const latest = unreadItems[0];
+            if (!notifiedIdsRef.current.has(latest.recipientId)) {
+              sendNativeNotification(
+                `Thông báo mới: ${latest.title}`,
+                latest.content
+              );
+              // Mark all currently fetched unread items as notified for this session
+              unreadItems.forEach(item => notifiedIdsRef.current.add(item.recipientId));
+            }
+          }
         }
-      } catch {
-        if (!ignore) {
-          setStudentUnreadCount(0);
-        }
+      } catch (err) {
+        console.error("Failed to check notifications:", err);
       }
     }
 
-    fetchUnreadCount();
+    // Initial check
+    checkNewNotifications();
+
+    // Poll every 60 seconds
+    const interval = setInterval(checkNewNotifications, 60000);
+
     return () => {
       ignore = true;
+      clearInterval(interval);
     };
   }, []);
 
@@ -96,19 +121,26 @@ export default function StudentPage() {
     [isMonitor, studentUnreadCount],
   );
 
-  const FeatureComponent = FEATURE_COMPONENTS[activeFeature] || StudentDashboard;
-  const featureProps =
-    activeFeature === "notifications"
-      ? { onUnreadCountChange: setStudentUnreadCount }
-      : { onNavigate: setActiveFeature };
-  const fullNameLabel = user?.displayName || "Student";
-  const userIdLabel = user?.profileCode || user?.userId || "---";
-  const avatarLetter = (fullNameLabel || "S").slice(0, 1).toUpperCase();
-
   const handleLogout = async () => {
     await logout();
     navigate("/auth", { replace: true });
   };
+
+  const FeatureComponent = FEATURE_COMPONENTS[activeFeature] || StudentDashboard;
+  const featureProps =
+    activeFeature === "notifications"
+      ? { onUnreadCountChange: setStudentUnreadCount }
+      : activeFeature === "utilities"
+        ? {
+            onNavigate: setActiveFeature,
+            unreadCount: studentUnreadCount,
+            isMonitor,
+            onLogout: handleLogout,
+          }
+        : { onNavigate: setActiveFeature };
+  const fullNameLabel = user?.displayName || "Student";
+  const userIdLabel = user?.profileCode || user?.userId || "---";
+  const avatarLetter = (fullNameLabel || "S").slice(0, 1).toUpperCase();
 
   return (
     <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
@@ -122,7 +154,7 @@ export default function StudentPage() {
       <main className="flex-1 flex flex-col md:flex-row">
         <StudentSidebar items={sidebarItems} activeFeature={activeFeature} onSelect={setActiveFeature} />
 
-        <div className="flex-1 p-4 md:p-8 max-w-6xl mx-auto w-full pb-20 md:pb-8">
+        <div className="flex-1 w-full max-w-6xl mx-auto p-3 sm:p-4 md:p-8 pb-24 md:pb-8">
           <FeatureComponent {...featureProps} />
         </div>
       </main>
@@ -130,7 +162,6 @@ export default function StudentPage() {
       <StudentMobileNav
         activeFeature={activeFeature}
         onSelect={setActiveFeature}
-        onLogout={handleLogout}
         unreadCount={studentUnreadCount}
       />
     </div>
