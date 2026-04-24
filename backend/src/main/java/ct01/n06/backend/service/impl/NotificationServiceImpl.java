@@ -261,14 +261,15 @@ public class NotificationServiceImpl implements NotificationService {
       }
 
       String recipientName = StringUtils.hasText(resolvedStudent.getFullName()) ? resolvedStudent.getFullName() : "Bạn";
-      emailService.sendNotificationEmail(
+      NotificationEmailJob job = new NotificationEmailJob(
           "[UniPoint] " + title,
           content,
           "Hệ thống UniPoint",
-          List.of(new EmailRecipient(email.trim(), recipientName)),
+          List.of(new Recipient(email.trim(), recipientName)),
           null,
           null
       );
+      emailQueueService.enqueueNotificationEmail(job);
     } catch (Exception ex) {
       log.warn("Gửi email thông báo check-in thất bại: studentId={}, eventId={}",
           student.getId(),
