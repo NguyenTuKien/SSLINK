@@ -145,6 +145,23 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.12</version>
+                <configuration>
+                    <excludes>
+                        <exclude>ct01/n06/backend/config/**</exclude>
+                        <exclude>ct01/n06/backend/dto/**</exclude>
+                        <exclude>ct01/n06/backend/entity/**</exclude>
+                        <exclude>ct01/n06/backend/exception/**</exclude>
+                        <exclude>ct01/n06/backend/mapper/**</exclude>
+                        <exclude>ct01/n06/backend/security/**</exclude>
+                        <exclude>ct01/n06/backend/filter/**</exclude>
+                        <exclude>ct01/n06/backend/aspect/**</exclude>
+                        <exclude>ct01/n06/backend/constant/**</exclude>
+                        <exclude>ct01/n06/backend/util/**</exclude>
+                        <exclude>ct01/n06/backend/facade/**</exclude>
+                        <exclude>ct01/n06/backend/consumer/**</exclude>
+                        <exclude>ct01/n06/backend/controller/**</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <!-- Prepares the property pointing to the JaCoCo runtime agent -->
                     <execution>
