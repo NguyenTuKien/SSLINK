@@ -9,4 +9,4 @@ opencv:
     type: ClusterIP
     port: 8000
   secrets:
-    AI_FACE_SERVICE_AUTH_TOKEN: "6a0899fcedbbcc4c19ea8a2d259ed16ebb83789e52791152bd52f84d31f4cda0"
+    AI_FACE_SERVICE_AUTH_TOKEN: "dummy_ai_face_service_auth_token"
