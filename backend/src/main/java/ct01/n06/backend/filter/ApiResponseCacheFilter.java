@@ -112,7 +112,7 @@ public class ApiResponseCacheFilter extends OncePerRequestFilter {
     ContentCachingResponseWrapper wrappedResponse = new ContentCachingResponseWrapper(response);
     try {
       filterChain.doFilter(request, wrappedResponse);
-      writeToCacheIfEligible(cacheKey, wrappedResponse);
+      writeToCacheIfEligible(request, cacheKey, wrappedResponse);
       wrappedResponse.setHeader("X-Redis-Cache", "MISS");
     } finally {
       wrappedResponse.copyBodyToResponse();
@@ -146,7 +146,7 @@ public class ApiResponseCacheFilter extends OncePerRequestFilter {
     }
   }
 
-  private void writeToCacheIfEligible(String cacheKey, ContentCachingResponseWrapper response) {
+  private void writeToCacheIfEligible(HttpServletRequest request, String cacheKey, ContentCachingResponseWrapper response) {
     if (ttlSeconds <= 0) {
       return;
     }
@@ -170,7 +170,7 @@ public class ApiResponseCacheFilter extends OncePerRequestFilter {
     CachedHttpResponse payload = new CachedHttpResponse(status, contentType, body);
 
     long finalTtl = ttlSeconds;
-    String path = ((HttpServletRequest) response.getResponse()).getServletPath();
+    String path = request.getServletPath();
     if (path != null && QR_GENERATE_PATH_PATTERN.matcher(path).matches()) {
       finalTtl = qrcodeTtlSeconds;
     }
