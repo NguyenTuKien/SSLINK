@@ -52,26 +52,81 @@ export default function StudentFaceProfilePanel({ required = false, onCompleted 
     };
   }, [notice.message]);
 
-  async function loadData() {
-    setLoading(true);
-    setNotice({ type: "", message: "" });
+  async function loadData(silent = false) {
+    if (!silent) {
+      setLoading(true);
+      setNotice({ type: "", message: "" });
+    }
     try {
       const [statusPayload, requestPayload] = await Promise.all([
         getStudentFaceStatus(),
         getStudentFaceUpdateRequests({ size: 10 }),
       ]);
-      setStatus(statusPayload);
+      
+      setStatus((prevStatus) => {
+        if (silent && prevStatus?.status === "PENDING_APPROVAL" && statusPayload?.status === "APPROVED") {
+          if (onCompleted) setTimeout(onCompleted, 1500);
+        }
+        return statusPayload;
+      });
+
       setRequests(Array.isArray(requestPayload?.items) ? requestPayload.items : []);
     } catch (error) {
-      setNotice({ type: "error", message: error.message });
+      if (!silent) setNotice({ type: "error", message: error.message });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    let intervalId = null;
+    if (status?.status === "PENDING_APPROVAL") {
+      intervalId = setInterval(() => {
+        loadData(true);
+      }, 3000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [status?.status]);
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setImage(null);
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setNotice({ type: "error", message: "Kích thước ảnh vượt quá giới hạn 2MB." });
+      setImage(null);
+      event.target.value = ""; // Reset input
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(img.src);
+      if (img.width > 2048 || img.height > 2048) {
+        setNotice({ type: "error", message: "Độ phân giải ảnh quá cao. Vui lòng chọn ảnh có kích thước tối đa 2048x2048 pixel." });
+        setImage(null);
+        event.target.value = ""; // Reset input
+      } else {
+        setNotice({ type: "", message: "" });
+        setImage(file);
+      }
+    };
+    img.onerror = () => {
+      setNotice({ type: "error", message: "Không thể đọc ảnh. Vui lòng chọn ảnh hợp lệ." });
+      setImage(null);
+      event.target.value = ""; // Reset input
+    };
+    img.src = URL.createObjectURL(file);
+  };
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -136,6 +191,12 @@ export default function StudentFaceProfilePanel({ required = false, onCompleted 
           </span>
         </div>
 
+        {status?.warningMessage && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {status.warningMessage}
+          </div>
+        )}
+
         {notice.message && (
           <div
             className={`mt-4 rounded-lg border px-4 py-3 text-sm ${notice.type === "success"
@@ -163,7 +224,15 @@ export default function StudentFaceProfilePanel({ required = false, onCompleted 
       </div>
 
       {(notEnrolled || canRequestUpdate || required) && (
-        <form onSubmit={handleSubmit} className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <form onSubmit={handleSubmit} className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          {(submitting || status?.status === "PENDING_APPROVAL") && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-slate-900/70">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+              <p className="mt-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                {submitting ? "Đang gửi ảnh..." : "Đang phân tích khuôn mặt bằng AI..."}
+              </p>
+            </div>
+          )}
           <div className="grid gap-5 md:grid-cols-[180px_1fr]">
             <div className="flex h-44 items-center justify-center overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-950">
               {previewUrl ? (
@@ -179,7 +248,7 @@ export default function StudentFaceProfilePanel({ required = false, onCompleted 
                   type="file"
                   accept="image/*"
                   capture="user"
-                  onChange={(event) => setImage(event.target.files?.[0] || null)}
+                  onChange={handleImageChange}
                   className="mt-2 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
                 />
               </label>

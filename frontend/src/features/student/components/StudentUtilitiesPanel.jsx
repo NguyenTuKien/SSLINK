@@ -4,6 +4,7 @@ const UTILITY_ITEMS = [
   { key: "history", label: "Lịch sử hoạt động", icon: "history" },
   { key: "statistics", label: "Thống kê", icon: "bar_chart" },
   { key: "evidence", label: "Khai báo minh chứng", icon: "verified_user" },
+  { key: "face-profile", label: "Ảnh khuôn mặt", icon: "face" },
   { key: "evaluation", label: "Phiếu rèn luyện", icon: "assignment" },
 ];
 
