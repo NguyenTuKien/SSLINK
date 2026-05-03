@@ -6,6 +6,7 @@ const UTILITIES_FEATURES = new Set([
   "evidence",
   "evaluation",
   "manage-class",
+  "face-profile",
   "utilities",
 ]);
 

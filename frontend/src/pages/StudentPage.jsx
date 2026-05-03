@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { getStudentFaceStatus } from "../api/faceApi";
 import { getStudentNotificationUnreadCount, getStudentNotifications } from "../api/notificationStatisticsApi";
 import { sendNativeNotification } from "../shared/utils/sendNotification";
 import { useRef } from "react";
@@ -15,6 +16,7 @@ import StudentStatisticsPanel from "../features/student/components/StudentStatis
 import StudentNotificationsPanel from "../features/student/components/StudentNotificationsPanel";
 import StudentEvaluationBoard from "../features/student/StudentEvaluationBoard";
 import StudentEvidenceDeclarationPanel from "../features/student/components/StudentEvidenceDeclarationPanel";
+import StudentFaceProfilePanel from "../features/student/components/StudentFaceProfilePanel";
 import StudentUtilitiesPanel from "../features/student/components/StudentUtilitiesPanel";
 
 function normalizeRole(role) {
@@ -30,6 +32,7 @@ function buildSidebarItems(isMonitor) {
     { key: "history", label: "Lịch sử hoạt động", icon: "history" },
     { key: "statistics", label: "Thống kê", icon: "bar_chart" },
     { key: "evidence", label: "Khai báo minh chứng", icon: "verified_user" },
+    { key: "face-profile", label: "Ảnh khuôn mặt", icon: "face" },
     { key: "scan-qr", label: "Quét sự kiện", icon: "qr_code_scanner" },
     { key: "evaluation", label: "Phiếu rèn luyện", icon: "assignment" },
   ];
@@ -56,6 +59,7 @@ const FEATURE_COMPONENTS = {
   evaluation: StudentEvaluationBoard,
   "manage-class": MonitorClass,
   evidence: StudentEvidenceDeclarationPanel,
+  "face-profile": StudentFaceProfilePanel,
   utilities: StudentUtilitiesPanel,
 };
 
@@ -67,7 +71,30 @@ export default function StudentPage() {
 
   const [activeFeature, setActiveFeature] = useState("dashboard");
   const [studentUnreadCount, setStudentUnreadCount] = useState(0);
+  const [requiresFaceEnrollment, setRequiresFaceEnrollment] = useState(false);
   const notifiedIdsRef = useRef(new Set());
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function checkFaceStatus() {
+      try {
+        const payload = await getStudentFaceStatus();
+        if (!ignore) {
+          setRequiresFaceEnrollment(payload?.status === "NOT_ENROLLED");
+        }
+      } catch {
+        if (!ignore) {
+          setRequiresFaceEnrollment(false);
+        }
+      }
+    }
+
+    checkFaceStatus();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -164,6 +191,14 @@ export default function StudentPage() {
         onSelect={setActiveFeature}
         unreadCount={studentUnreadCount}
       />
+
+      {requiresFaceEnrollment && (
+        <div className="fixed inset-0 z-[80] overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="mx-auto my-6 max-w-4xl rounded-lg bg-slate-50 p-4 shadow-2xl dark:bg-slate-950">
+            <StudentFaceProfilePanel required onCompleted={() => setRequiresFaceEnrollment(false)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

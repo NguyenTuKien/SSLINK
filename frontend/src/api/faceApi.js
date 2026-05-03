@@ -11,7 +11,7 @@ function appendImagePayload(formData, imageFieldName, image, extra = {}) {
 }
 
 export function getStudentFaceStatus() {
-  return apiRequest("/v1/student/face-profile/status");
+  return apiRequest(`/v1/student/face-profile/status?_t=${Date.now()}`);
 }
 
 export function enrollStudentFace({ image, confirmRealImage }) {
@@ -31,13 +31,13 @@ export function createStudentFaceUpdateRequest({ image, reason, confirmRealImage
 }
 
 export function getStudentFaceUpdateRequests({ status, page = 0, size = 20 } = {}) {
-  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  const params = new URLSearchParams({ page: String(page), size: String(size), _t: String(Date.now()) });
   if (status) params.set("status", status);
   return apiRequest(`/v1/student/face-profile/update-requests?${params.toString()}`);
 }
 
 export function getLecturerFaceUpdateRequests({ status, classId, page = 0, size = 20 } = {}) {
-  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  const params = new URLSearchParams({ page: String(page), size: String(size), _t: String(Date.now()) });
   if (status) params.set("status", status);
   if (classId) params.set("classId", String(classId));
   return apiRequest(`/v1/lecturer/face-update-requests?${params.toString()}`);
