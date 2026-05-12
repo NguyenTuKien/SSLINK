@@ -15,9 +15,35 @@ permissions:
   packages: write
 
 jobs:
+  changes:
+    name: Check for file changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      opencv: ${{ steps.filter.outputs.opencv }}
+      workflow: ${{ steps.filter.outputs.workflow }}
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            opencv:
+              - 'opencv/**'
+            workflow:
+              - '.github/workflows/**'
+
   unit_test_job:
     name: Run Unit Tests and Generate Coverage
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.workflow == 'true' }}
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -76,6 +102,8 @@ jobs:
   helm_lint_job:
     name: Helm Chart Lint
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.opencv == 'true' || needs.changes.outputs.workflow == 'true' }}
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -93,10 +121,12 @@ jobs:
   tag_job:
     name: Get Image Tag
     runs-on: ubuntu-latest 
+    needs: [changes]
     if: >
-      github.ref == 'refs/heads/main' ||
+      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.opencv == 'true' || needs.changes.outputs.workflow == 'true') &&
+      (github.ref == 'refs/heads/main' ||
       startsWith(github.ref, 'refs/tags/') ||
-      github.event_name == 'pull_request'
+      github.event_name == 'pull_request')
     outputs:
       docker_tag: ${{ steps.calc_tag.outputs.tag }} 
     steps:
@@ -137,18 +167,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and Push Backend
+        if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.workflow == 'true' }}
         run: |
           docker pull $REGISTRY_IMAGE/unipoint-backend:$TAG || true
           docker build --cache-from $REGISTRY_IMAGE/unipoint-backend:$TAG -t $REGISTRY_IMAGE/unipoint-backend:$TAG ./backend
           docker push $REGISTRY_IMAGE/unipoint-backend:$TAG
 
       - name: Build and Push Frontend
+        if: ${{ needs.changes.outputs.frontend == 'true' || needs.changes.outputs.workflow == 'true' }}
         run: |
           docker pull $REGISTRY_IMAGE/unipoint-frontend:$TAG || true
           docker build --cache-from $REGISTRY_IMAGE/unipoint-frontend:$TAG -t $REGISTRY_IMAGE/unipoint-frontend:$TAG ./frontend
           docker push $REGISTRY_IMAGE/unipoint-frontend:$TAG
 
       - name: Build and Push OpenCV
+        if: ${{ needs.changes.outputs.opencv == 'true' || needs.changes.outputs.workflow == 'true' }}
         run: |
           docker pull $REGISTRY_IMAGE/unipoint-opencv:$TAG || true
           docker build --cache-from $REGISTRY_IMAGE/unipoint-opencv:$TAG -t $REGISTRY_IMAGE/unipoint-opencv:$TAG ./opencv
@@ -299,6 +332,7 @@ jobs:
           exit-code: '0'
           
       - name: Run Trivy vulnerability scanner - Backend Image
+        if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.workflow == 'true' }}
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: '${{ env.REGISTRY_IMAGE }}/unipoint-backend:${{ env.TAG }}'
@@ -306,6 +340,7 @@ jobs:
           exit-code: '0'
 
       - name: Run Trivy vulnerability scanner - Frontend Image
+        if: ${{ needs.changes.outputs.frontend == 'true' || needs.changes.outputs.workflow == 'true' }}
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: '${{ env.REGISTRY_IMAGE }}/unipoint-frontend:${{ env.TAG }}'
@@ -313,6 +348,7 @@ jobs:
           exit-code: '0'
 
       - name: Run Trivy vulnerability scanner - OpenCV Image
+        if: ${{ needs.changes.outputs.opencv == 'true' || needs.changes.outputs.workflow == 'true' }}
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: '${{ env.REGISTRY_IMAGE }}/unipoint-opencv:${{ env.TAG }}'
@@ -339,10 +375,10 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
-      - name: Clone Config Repo (GitLab)
+      - name: Clone Config Repo (GitHub)
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
           
           git clone ${REPO_CONFIG} Config
           
