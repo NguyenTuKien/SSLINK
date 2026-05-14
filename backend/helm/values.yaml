@@ -13,6 +13,10 @@ backend:
   service:
     type: ClusterIP
     port: 8080
+  ingress:
+    enabled: true
+    host: "api.unipoint.ngtukien.id.vn"
+    path: /api
   environment:
     SPRING_PROFILES_ACTIVE: "default"
     CORS_ALLOWED_ORIGINS: "*"
@@ -43,6 +47,13 @@ backend:
     FACE_INTEGRATION_BASE_URL: "http://ttcs-opencv:8000"
     # Mail
     MAIL_USERNAME: ""
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
   secrets:
     POSTGRES_PASSWORD: ttcs_2026
     REDIS_PASSWORD: TTCS_2026
