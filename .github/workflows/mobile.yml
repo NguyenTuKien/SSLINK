@@ -6,9 +6,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ==========================================
-  # 🤖 JOB 1: BUILD ANDROID
-  # ==========================================
   build-android:
     runs-on: ubuntu-24.04
     defaults:
@@ -58,40 +55,52 @@ jobs:
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" > keystore.properties
           echo "password=${{ secrets.ANDROID_KEY_PASSWORD }}" >> keystore.properties
 
-          echo "${{ secrets.ANDROID_KEY_BASE64 }}" | base64 -d > $RUNNER_TEMP/upload-keystore.jks
+          echo "${{ secrets.ANDROID_KEY_BASE64 }}" | base64 -d > "$RUNNER_TEMP/upload-keystore.jks"
           echo "storeFile=$RUNNER_TEMP/upload-keystore.jks" >> keystore.properties
 
       - name: Patch Gradle Signing Config
         run: |
-          GRADLE_FILE="src-tauri/gen/android/app/build.gradle.kts"
+          python3 <<'PY'
+          from pathlib import Path
 
-          if ! grep -q "import java.io.FileInputStream" "$GRADLE_FILE"; then
-            sed -i '1i import java.io.FileInputStream\nimport java.util.Properties' "$GRADLE_FILE"
-          fi
+          gradle_file = Path("src-tauri/gen/android/app/build.gradle.kts")
+          text = gradle_file.read_text()
 
-          if ! grep -q 'create("release")' "$GRADLE_FILE"; then
-            sed -i '/android {/a\
-    signingConfigs {\
-        create("release") {\
-            val keystorePropertiesFile = rootProject.file("keystore.properties")\
-            val keystoreProperties = Properties()\
-            if (keystorePropertiesFile.exists()) {\
-                keystoreProperties.load(FileInputStream(keystorePropertiesFile))\
-            }\
-            keyAlias = keystoreProperties["keyAlias"] as String\
-            keyPassword = keystoreProperties["password"] as String\
-            storeFile = file(keystoreProperties["storeFile"] as String)\
-            storePassword = keystoreProperties["password"] as String\
-        }\
-    }\
-' "$GRADLE_FILE"
-          fi
+          imports = "import java.io.FileInputStream\nimport java.util.Properties\n"
 
-          if ! grep -q 'signingConfig = signingConfigs.getByName("release")' "$GRADLE_FILE"; then
-            sed -i '/getByName("release") {/a\
-            signingConfig = signingConfigs.getByName("release")\
-' "$GRADLE_FILE"
-          fi
+          if "import java.io.FileInputStream" not in text:
+              text = imports + text
+
+          signing_config = """
+              signingConfigs {
+                  create("release") {
+                      val keystorePropertiesFile = rootProject.file("keystore.properties")
+                      val keystoreProperties = Properties()
+
+                      if (keystorePropertiesFile.exists()) {
+                          keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+                      }
+
+                      keyAlias = keystoreProperties["keyAlias"] as String
+                      keyPassword = keystoreProperties["password"] as String
+                      storeFile = file(keystoreProperties["storeFile"] as String)
+                      storePassword = keystoreProperties["password"] as String
+                  }
+              }
+          """
+
+          if 'create("release")' not in text:
+              text = text.replace("android {", "android {" + signing_config, 1)
+
+          if 'signingConfig = signingConfigs.getByName("release")' not in text:
+              text = text.replace(
+                  'getByName("release") {',
+                  'getByName("release") {\n            signingConfig = signingConfigs.getByName("release")',
+                  1
+              )
+
+          gradle_file.write_text(text)
+          PY
 
       - name: Build Android APK
         env:
@@ -107,9 +116,6 @@ jobs:
           path: |
             frontend/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
 
-  # ==========================================
-  # 🍎 JOB 2: BUILD IOS
-  # ==========================================
   build-ios:
     runs-on: macos-latest
     defaults:
