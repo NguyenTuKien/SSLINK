@@ -1,4 +1,7 @@
 import { AUTH_STORAGE_KEY } from "../../context/AuthContext";
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+
+const isTauri = typeof window !== "undefined" && !!window.__TAURI_INTERNALS__;
 
 const DEFAULT_API_BASE_URL = "/api";
 export const API_BASE_URL =
@@ -91,13 +94,15 @@ export async function apiRequest(path, options = {}) {
 
   let response;
   try {
-    response = await fetch(url, {
+    const fetchFn = isTauri ? tauriFetch : fetch;
+    response = await fetchFn(url, {
       method: options.method || "GET",
       ...options,
       credentials: "include",
       headers,
     });
-  } catch {
+  } catch (err) {
+    console.error("apiRequest Error:", err);
     throw new Error(
       "Không kết nối được backend. Kiểm tra backend đang chạy tại http://localhost:8080.",
     );
@@ -142,13 +147,15 @@ export async function apiBinaryRequest(path, options = {}) {
 
   let response;
   try {
-    response = await fetch(url, {
+    const fetchFn = isTauri ? tauriFetch : fetch;
+    response = await fetchFn(url, {
       method: options.method || "GET",
       ...options,
       credentials: "include",
       headers,
     });
-  } catch {
+  } catch (err) {
+    console.error("apiBinaryRequest Error:", err);
     throw new Error(
       "Không kết nối được backend. Kiểm tra backend đang chạy tại http://localhost:8080.",
     );
