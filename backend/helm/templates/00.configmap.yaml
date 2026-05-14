@@ -35,3 +35,4 @@ data:
   SPRING_MAIL_USERNAME: "{{ .Values.backend.environment.MAIL_USERNAME }}"
   # AI Service Integration
   FACE_INTEGRATION_BASE_URL: "{{ .Values.backend.environment.FACE_INTEGRATION_BASE_URL }}"
+  MANAGEMENT_HEALTH_MAIL_ENABLED: "{{ .Values.backend.environment.MANAGEMENT_HEALTH_MAIL_ENABLED | default "true" }}"
